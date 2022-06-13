@@ -1,0 +1,189 @@
+/*
+CREATE TABLE Pieces (
+ Code INTEGER NOT NULL,
+ Name TEXT NOT NULL,
+ PRIMARY KEY (Code)
+ );
+CREATE TABLE Providers (
+ Code VARCHAR(40) NOT NULL,  
+ Name TEXT NOT NULL,
+PRIMARY KEY (Code) 
+ );
+CREATE TABLE Provides (
+ Piece INTEGER, 
+ Provider VARCHAR(40), 
+ Price INTEGER NOT NULL,
+ PRIMARY KEY(Piece, Provider) 
+ );
+ 
+
+INSERT INTO Providers(Code, Name) VALUES('HAL','Clarke Enterprises');
+INSERT INTO Providers(Code, Name) VALUES('RBT','Susan Calvin Corp.');
+INSERT INTO Providers(Code, Name) VALUES('TNBC','Skellington Supplies');
+
+INSERT INTO Pieces(Code, Name) VALUES(1,'Sprocket');
+INSERT INTO Pieces(Code, Name) VALUES(2,'Screw');
+INSERT INTO Pieces(Code, Name) VALUES(3,'Nut');
+INSERT INTO Pieces(Code, Name) VALUES(4,'Bolt');
+
+INSERT INTO Provides(Piece, Provider, Price) VALUES(1,'HAL',10);
+INSERT INTO Provides(Piece, Provider, Price) VALUES(1,'RBT',15);
+INSERT INTO Provides(Piece, Provider, Price) VALUES(2,'HAL',20);
+INSERT INTO Provides(Piece, Provider, Price) VALUES(2,'RBT',15);
+INSERT INTO Provides(Piece, Provider, Price) VALUES(2,'TNBC',14);
+INSERT INTO Provides(Piece, Provider, Price) VALUES(3,'RBT',50);
+INSERT INTO Provides(Piece, Provider, Price) VALUES(3,'TNBC',45);
+INSERT INTO Provides(Piece, Provider, Price) VALUES(4,'HAL',5);
+INSERT INTO Provides(Piece, Provider, Price) VALUES(4,'RBT',7);
+
+
+*/
+
+SELECT*
+FROM Providers
+
+SELECT*
+FROM Provides
+
+SELECT*
+FROM Pieces
+
+Questions
+-- 5.1 Select the name of all the pieces. 
+SELECT name
+FROM Pieces;
+
+-- 5.2  Select all the providers' data. 
+SELECT pvdr.code, pvdr.name, pvd.piece
+FROM Providers AS pvdr
+LEFT JOIN Provides AS pvd
+ON pvdr.code = pvd.provider
+ORDER BY pvdr.code;
+
+-- 5.3 Obtain the average price of each piece (show only the piece code and the average price).
+
+SELECT*
+FROM Providers;
+
+SELECT piece, ROUND(AVG(price),2) AS avg_price
+FROM Provides
+GROUP BY piece
+ORDER BY piece;
+
+-- 5.4  Obtain the names of all providers who supply piece 1.
+
+SELECT*
+FROM Providers;
+
+SELECT*
+FROM Provides;
+
+SELECT*
+FROM Pieces;
+
+SELECT name
+FROM Providers AS pvdr
+LEFT JOIN Provides AS pvds
+ON pvdr.code = pvds.provider
+WHERE piece = 1;
+
+
+-- 5.5 Select the name of pieces provided by provider with code "HAL".
+
+SELECT*
+FROM Providers;
+
+SELECT*
+FROM Provides;
+
+SELECT*
+FROM Pieces;
+
+SELECT name
+FROM Provides AS pvds
+LEFT JOIN Pieces AS pcs
+ON pvds.piece = pcs.code
+WHERE pvds.provider = 'HAL';
+
+-- 5.6 For each piece, find the most expensive offering of that piece 
+-- and include the piece name, provider name, and price 
+--(note that there could be two providers who supply the same piece at the most expensive price).
+
+SELECT*
+FROM Providers;
+
+SELECT*
+FROM Provides
+ORDER BY piece;
+
+SELECT*
+FROM Pieces;
+
+WITH max_prices AS(
+SELECT piece, MAX(price) AS max_price
+FROM Provides
+GROUP BY piece
+ORDER BY piece),
+
+max_prices_full AS (SELECT p.piece, p.provider, p.price
+FROM Provides AS p
+JOIN max_prices AS mp
+ON mp.piece = p.piece
+WHERE p.price = max_price)
+
+SELECT name AS piece_name, provider, price
+FROM max_prices_full AS mpf
+JOIN Pieces AS pcs
+ON mpf.piece = pcs.code;
+
+
+
+-- 5.7 Add an entry to the database to indicate that "Skellington Supplies" (code "TNBC") 
+-- will provide sprockets (code "1") for 7 cents each.
+
+SELECT*
+FROM Provides;
+
+INSERT INTO Provides(Piece, Provider, Price) VALUES(1,'TNBC',7);
+
+-- 5.8 Increase all prices by one cent.
+SELECT*
+FROM Provides;
+
+UPDATE Provides
+SET price = price +1;
+
+-- 5.9 Update the database to reflect that "Susan Calvin Corp." 
+-- (code "RBT") will not supply bolts (code 4).
+SELECT*
+FROM Provides
+WHERE provider = 'RBT';
+
+DELETE FROM Provides
+WHERE provider = 'RBT' AND piece = 4;
+
+-- 5.10 Update the database to reflect that "Susan Calvin Corp." 
+-- (code "RBT") will not supply any pieces (the provider should still remain in the database).
+DELETE FROM Provides
+WHERE provider = 'RBT';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

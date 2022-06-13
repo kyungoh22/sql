@@ -1,0 +1,366 @@
+/*
+CREATE TABLE IF NOT EXISTS Departments (
+  Code INTEGER,
+  Name TEXT NOT NULL,
+  Budget decimal NOT NULL,
+  PRIMARY KEY (Code)   
+);
+
+CREATE TABLE IF NOT EXISTS Employees (
+  SSN INTEGER,
+  Name varchar(255) NOT NULL ,
+  LastName varchar(255) NOT NULL ,
+  Department INTEGER NOT NULL , 
+  PRIMARY KEY (SSN)   
+);
+
+
+INSERT INTO Departments(Code,Name,Budget) VALUES(14,'IT',65000);
+INSERT INTO Departments(Code,Name,Budget) VALUES(37,'Accounting',15000);
+INSERT INTO Departments(Code,Name,Budget) VALUES(59,'Human Resources',240000);
+INSERT INTO Departments(Code,Name,Budget) VALUES(77,'Research',55000);
+
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('123234877','Michael','Rogers',14);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('152934485','Anand','Manikutty',14);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('222364883','Carol','Smith',37);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('326587417','Joe','Stevens',37);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('332154719','Mary-Anne','Foster',14);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('332569843','George','ODonnell',77);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('546523478','John','Doe',59);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('631231482','David','Smith',77);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('654873219','Zacary','Efron',59);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('745685214','Eric','Goldsmith',59);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('845657245','Elizabeth','Doe',14);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('845657246','Kumar','Swamy',14);
+*/
+
+
+SELECT *
+FROM Departments;
+
+SELECT *
+FROM Employees;
+
+
+-- 2.1 Select the last name of all employees.
+
+SELECT lastname
+FROM Employees;
+
+
+-- 2.2 Select the last name of all employees, without duplicates.
+
+SELECT DISTINCT lastname
+FROM Employees;
+
+-- 2.3 Select all the data of employees whose last name is "Smith".
+SELECT * 
+FROM Employees
+WHERE lastname = 'Smith';
+
+-- 2.4 Select all the data of employees whose last name is "Smith" or "Doe".
+SELECT *
+FROM Employees
+WHERE lastname IN ('Smith', 'Doe');
+
+-- 2.5 Select all the data of employees that work in department 14.
+SELECT *
+FROM Employees
+WHERE department = 14;
+
+-- 2.6 Select all the data of employees that work in department 37 or department 77.
+SELECT *
+FROM Employees
+WHERE department IN (37, 77);
+
+-- 2.7 Select all the data of employees whose last name begins with an "S".
+SELECT *
+FROM Employees
+WHERE lastname LIKE 'S%';
+
+-- 2.8 Select the sum of all the departments' budgets.
+SELECT SUM(budget)
+FROM Departments;
+
+-- 2.9 Select the number of employees in each department 
+-- (you only need to show the department code and the number of employees).
+SELECT *
+FROM Employees;
+
+SELECT department, COUNT(department)
+FROM Employees
+GROUP BY department;
+
+
+-- 2.10 Select all the data of employees, including each employee's department's data.
+
+SELECT *
+FROM Employees;
+
+SELECT *
+FROM Departments;
+
+SELECT *
+FROM Employees AS E
+LEFT JOIN Departments AS D
+ON E.department = D.code;
+
+
+
+-- 2.11 Select the name and last name of each employee, 
+-- along with the name and budget of the employee's department.
+
+SELECT E.name, lastname, D.name AS department, budget AS department_budget
+FROM Employees AS E
+LEFT JOIN Departments AS D
+ON E.department = D.code;
+
+
+-- 2.12 Select the name and last name of employees working for 
+-- departments with a budget greater than $60,000.
+
+SELECT E.name, lastname, D.name AS dept, budget AS dept_budget
+FROM Employees AS E
+LEFT JOIN Departments AS D
+ON E.department = D.code
+WHERE D.budget > 60000;
+
+
+-- 2.13 Select the departments with a budget larger 
+-- than the average budget of all the departments.
+
+
+SELECT name, budget
+FROM departments
+WHERE budget > 
+(SELECT AVG(budget)
+FROM Departments);
+
+-- 2.14 Select the names of departments with more than two employees.
+
+SELECT * 
+FROM Departments
+
+SELECT *
+FROM Employees
+
+-- Method 1: Subquery in WHERE clause
+
+-- Get department code and number of employees
+-- where num_employees >2
+SELECT department, COUNT(department) AS employee_count
+FROM Employees AS E
+GROUP BY department
+HAVING COUNT(department) > 2;
+
+-- Now get just the department code
+SELECT department
+FROM Employees AS E
+GROUP BY department
+HAVING COUNT(department) > 2;
+
+-- Now use above result as a subquery in WHERE clause
+
+SELECT name
+FROM Departments
+WHERE code IN (
+SELECT department
+FROM Employees AS E
+GROUP BY department
+HAVING COUNT(department) > 2
+);
+
+-- Method 2
+-- Subquery in FROM clause
+
+-- Subquery for employee counts
+SELECT department, COUNT(department) AS employee_count
+FROM Employees AS E
+GROUP BY department;
+
+SELECT D.name
+FROM (
+    SELECT department, COUNT(department) AS employee_count
+    FROM Employees AS E
+    GROUP BY department
+    ) AS EC
+LEFT JOIN Departments AS D
+ON EC.department = D.code
+WHERE EC.employee_count > 2;
+
+-- Method 3
+-- Using View
+
+DROP VIEW EC
+CREATE VIEW EC AS 
+    SELECT department, COUNT(department) AS employee_count
+    FROM Employees AS E
+    GROUP BY department;
+
+SELECT D.name
+FROM Departments AS D
+LEFT JOIN EC
+ON D.code = EC.department
+WHERE employee_count >2
+
+-- Method 4
+-- Using CTE
+
+WITH EC AS (
+    SELECT department, COUNT(department) AS employee_count
+    FROM Employees AS E
+    GROUP BY department
+)
+
+SELECT D.name
+FROM Departments AS D
+LEFT JOIN EC
+ON D.code = EC.department
+WHERE employee_count >2;
+
+
+
+-- 2.15 Select the name and last name of employees working for the two departments with lowest budget.
+
+
+SELECT *
+FROM Departments;
+
+SELECT *
+FROM Employees;
+
+SELECT *
+FROM Departments AS D
+ORDER BY budget
+LIMIT 2;
+
+-- Using View
+
+DROP VIEW small_budget;
+CREATE VIEW small_budget AS
+    SELECT code, budget
+    FROM Departments AS D
+    ORDER BY budget
+    LIMIT 2;
+
+-- query using view + WHERE clause
+SELECT name, lastname
+FROM Employees AS E
+WHERE E.department IN (SELECT code FROM small_budget);
+
+-- alternatively: 
+-- query using view + INNER JOIN
+SELECT name, lastname
+FROM Employees AS E
+JOIN small_budget 
+ON E.department = small_budget.code;
+
+SELECT * 
+FROM Employees;
+
+
+-- Just using a subquery in WHERE
+
+SELECT *
+FROM Employees AS E
+WHERE E.department IN (SELECT code
+    FROM Departments AS D
+    ORDER BY budget
+    LIMIT 2);
+
+
+
+
+-- 2.16  Add a new department called "Quality Assurance", with a budget 
+-- of $40,000 and departmental code 11. 
+-- And Add an employee called "Mary Moore" in that department, 
+-- with SSN 847-21-9811.
+
+INSERT INTO Departments(Code,Name,Budget) VALUES(11,'Quality Assurance',40000);
+INSERT INTO Employees(SSN,Name,LastName,Department) VALUES('847219811','Mary','Moore',11);
+
+SELECT *
+FROM Departments;
+
+SELECT *
+FROM Employees;
+
+
+-- 2.17 Reduce the budget of all departments by 10%.
+SELECT *
+FROM Departments;
+
+SELECT code, name, budget * 0.9 AS new_budget
+FROM Departments;
+
+
+-- 2.18 Reassign all employees from the Research department (code 77) to the IT department (code 14).
+
+SELECT *
+FROM Employees;
+
+UPDATE Employees
+SET department = 14
+WHERE department = 77
+
+
+-- 2.19 Delete from the table all employees in the IT department (code 14).
+DELETE FROM Employees
+WHERE department = 14;
+
+-- 2.20 Delete from the table all employees who work in departments with a budget greater than or equal to $60,000.
+
+SELECT *
+FROM Employees;
+
+DELETE FROM Employees
+WHERE department IN (SELECT code
+FROM Departments
+WHERE budget >= 60000);
+
+
+-- 2.21 Delete from the table all employees.
+
+DELETE FROM Employees;
+
+SELECT *
+FROM Employees;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

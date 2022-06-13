@@ -1,0 +1,119 @@
+-- Questions
+-- 9.1 Give the package name and how many times they're downloaded. Order by the 2nd column descently.
+
+SELECT package, COUNT (package) AS num_downloads
+FROM day_9
+GROUP BY package
+ORDER BY COUNT(package) DESC;
+
+-- 9.2 Give the package ranking (based on how many times it was downloaded) during 9AM to 11AM
+
+SELECT package, COUNT (package)
+FROM day_9
+WHERE time >= '09:00:00'
+AND time <= '11:00:00'
+GROUP BY package
+ORDER BY COUNT(package) DESC;
+
+-- 9.3 How many recordings are from China ("CN") or Japan("JP") or Singapore ("SG")?
+SELECT COUNT(*)
+FROM day_9
+WHERE country IN ('CN', 'JP', 'SG');
+
+-- 9.4 Print the countries whose downloaded are more than the downloads from China ("CN")
+
+
+SELECT country --, COUNT(country)
+FROM day_9
+GROUP BY country
+HAVING COUNT(country) > (
+                        SELECT COUNT(*)
+                        FROM day_9
+                        WHERE country = 'CN'
+                        )
+ORDER BY COUNT(country) DESC;
+
+-- 9.5 Print the average length of the package name of all the UNIQUE packages
+
+SELECT DISTINCT package, CHAR_LENGTH(package)
+FROM day_9
+ORDER BY CHAR_LENGTH(package);
+
+SELECT AVG(char_length)
+FROM (
+        SELECT DISTINCT package, CHAR_LENGTH(package)
+        FROM day_9
+        ORDER BY CHAR_LENGTH(package)
+    ) AS temp_table;
+
+
+-- 9.6 Get the package whose download count ranks 2nd 
+-- (print package name and its download count).
+
+SELECT package, COUNT (package) AS download_count
+FROM day_9
+GROUP BY package
+ORDER BY COUNT (package) DESC
+LIMIT 2;
+
+--------- ???? ---------
+-- @ Virginia: Is it possible to access just the second-rank row? Is there some kind of indexing method?
+
+
+-- 9.7 Print the name of the package whose download count is bigger than 1000.
+SELECT package, COUNT (package)
+FROM day_9
+GROUP BY package
+HAVING COUNT (package) > 1000;
+
+-- 9.8 The field "r_os" is the operating system of the users.
+    -- 	Here we would like to know what main system we have (ignore version number), 
+    --  the relevant counts, and the proportion (in percentage).
+SELECT *
+FROM day_9;
+
+SELECT DISTINCT r_os
+FROM day_9;
+
+
+-- Create duplicate table
+
+-- CREATE TABLE renamed AS (SELECT * FROM day_9);
+
+-- SELECT *
+-- FROM renamed
+
+
+-- use regex to get part of r_os before version number
+CREATE VIEW r_os_root_count AS
+SELECT SUBSTRING(r_os FROM '^.*?(?=[0-9]|$)' ) AS r_os_root, COUNT (SUBSTRING(r_os FROM '^.*?(?=[0-9]|$)' ))
+FROM day_9
+GROUP BY SUBSTRING(r_os FROM '^.*?(?=[0-9]|$)' );
+
+SELECT r_os_root, count, ROUND (100* (count / (SELECT SUM(count) FROM r_os_root_count)), 2) AS per_cent
+FROM r_os_root_count
+ORDER BY count DESC;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
