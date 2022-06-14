@@ -1,0 +1,1385 @@
+------------ Q1 -------------
+-----------------------------
+-----------------------------
+
+WITH users (user_id, action, date) 
+AS (VALUES 
+(1,'start', CAST('01-01-20' AS date)), 
+(1,'cancel', CAST('01-02-20' AS date)), 
+(2,'start', CAST('01-03-20' AS date)), 
+(2,'publish', CAST('01-04-20' AS date)), 
+(3,'start', CAST('01-05-20' AS date)), 
+(3,'cancel', CAST('01-06-20' AS date)), 
+(1,'start', CAST('01-07-20' AS date)), 
+(1,'publish', CAST('01-08-20' AS date))),
+
+
+-- retrieve count of starts, cancels, and publishes for each user
+t1 AS (
+SELECT user_id, 
+        COUNT (CASE WHEN action = 'start' THEN user_id END) AS count_start,
+        COUNT (CASE WHEN action = 'cancel' THEN user_id END) AS count_cancel,
+        COUNT (CASE WHEN action = 'publish' THEN user_id END) AS count_publish
+FROM users
+GROUP BY user_id
+ORDER BY user_id)
+
+-- calculate publication, cancelation rate for each user by dividing 
+-- by number of starts, casting as float by multiplying by 1.0 
+-- (default floor division is a quirk of some SQL tools, not always needed)
+
+--SELECT *
+--FROM t1
+
+
+SELECT user_id, ROUND (1.0 * count_cancel/count_start, 2) AS cancel_rate, ROUND (1.0 * count_publish/count_start, 2) AS publish_rate
+FROM t1;
+
+
+------------ Q2 -------------
+-----------------------------
+-----------------------------
+
+
+-- Table as it is:
+WITH transactions (sender, receiver, amount, transaction_date) 
+AS (VALUES 
+(5, 2, 10, CAST('2-12-20' AS date)),
+(1, 3, 15, CAST('2-13-20' AS date)), 
+(2, 1, 20, CAST('2-13-20' AS date)), 
+(2, 3, 25, CAST('2-14-20' AS date)), 
+(3, 1, 20, CAST('2-15-20' AS date)), 
+(3, 2, 15, CAST('2-15-20' AS date)), 
+(1, 4, 5, CAST('2-16-20' AS date)))
+
+SELECT *
+FROM transactions
+ORDER BY sender;
+
+
+
+-- My solution: 
+WITH transactions (sender, receiver, amount, transaction_date) 
+AS (VALUES 
+(5, 2, 10, CAST('2-12-20' AS date)),
+(1, 3, 15, CAST('2-13-20' AS date)), 
+(2, 1, 20, CAST('2-13-20' AS date)), 
+(2, 3, 25, CAST('2-14-20' AS date)), 
+(3, 1, 20, CAST('2-15-20' AS date)), 
+(3, 2, 15, CAST('2-15-20' AS date)), 
+(1, 4, 5, CAST('2-16-20' AS date))),
+
+t1 AS (
+SELECT sender, SUM (amount) AS total_loss
+FROM transactions
+GROUP BY sender
+ORDER BY sender),
+
+t2 AS (
+SELECT receiver, SUM (amount) AS total_gain
+FROM transactions
+    GROUP BY receiver
+    ORDER BY receiver
+)
+
+SELECT COALESCE (sender, receiver) AS user,
+        (COALESCE(total_gain, 0) - COALESCE(total_loss, 0)) AS net_change
+FROM t1
+FULL JOIN t2
+ON t1.sender = t2.receiver;
+
+
+
+--------------------------------- Q3 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+--From the following table containing a list of dates and items ordered, 
+-- write a query to return the most frequent item ordered on each date. 
+-- Return multiple items in the case of a tie.
+
+-- Table as it is:
+WITH items (date, item) 
+AS (VALUES 
+(CAST('01-01-20' AS date),'apple'), 
+(CAST('01-01-20' AS date),'apple'), 
+(CAST('01-01-20' AS date),'pear'), 
+(CAST('01-01-20' AS date),'pear'), 
+(CAST('01-02-20' AS date),'pear'), 
+(CAST('01-02-20' AS date),'pear'), 
+(CAST('01-02-20' AS date),'pear'), 
+(CAST('01-02-20' AS date),'orange'))
+
+SELECT *
+FROM items;
+
+WITH items (date, item) 
+AS (VALUES 
+(CAST('01-01-20' AS date),'apple'), 
+(CAST('01-01-20' AS date),'apple'), 
+(CAST('01-01-20' AS date),'pear'), 
+(CAST('01-01-20' AS date),'pear'), 
+(CAST('01-02-20' AS date),'pear'), 
+(CAST('01-02-20' AS date),'pear'), 
+(CAST('01-02-20' AS date),'pear'), 
+(CAST('01-02-20' AS date),'orange')),
+
+t1 AS (
+SELECT date, item, COUNT (*)
+FROM items
+GROUP BY date, item
+ORDER BY date, item),
+
+t2 AS (
+SELECT *,
+        RANK() OVER (PARTITION BY date ORDER BY count DESC) AS date_rank
+FROM t1)
+
+SELECT date, item
+FROM t2
+WHERE date_rank = 1;
+
+--------------------------------- Q4 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- From the following table of user actions, write a query to return
+-- for each user the time elapsed between the last action and the 
+-- second-to-last action, in ascending order by user ID.
+
+
+-- Table as given: 
+WITH users (user_id, action, action_date) 
+AS (VALUES 
+(1, 'start', CAST('2-12-20' AS date)), 
+(1, 'cancel', CAST('2-13-20' AS date)), 
+(2, 'start', CAST('2-11-20' AS date)), 
+(2, 'publish', CAST('2-14-20' AS date)), 
+(3, 'start', CAST('2-15-20' AS date)), 
+(3, 'cancel', CAST('2-15-20' AS date)), 
+(4, 'start', CAST('2-18-20' AS date)), 
+(1, 'publish', CAST('2-19-20' AS date)))
+
+SELECT *
+FROM users;
+
+WITH users (user_id, action, action_date) 
+AS (VALUES 
+(1, 'start', CAST('2-12-20' AS date)), 
+(1, 'cancel', CAST('2-13-20' AS date)), 
+(2, 'start', CAST('2-11-20' AS date)), 
+(2, 'publish', CAST('2-14-20' AS date)), 
+(3, 'start', CAST('2-15-20' AS date)), 
+(3, 'cancel', CAST('2-15-20' AS date)), 
+(4, 'start', CAST('2-18-20' AS date)), 
+(1, 'publish', CAST('2-19-20' AS date)))
+
+SELECT *
+FROM users
+ORDER BY user_id, action_date;
+
+
+WITH users (user_id, action, action_date) 
+AS (VALUES 
+(1, 'start', CAST('2-12-20' AS date)), 
+(1, 'cancel', CAST('2-13-20' AS date)), 
+(2, 'start', CAST('2-11-20' AS date)), 
+(2, 'publish', CAST('2-14-20' AS date)), 
+(3, 'start', CAST('2-15-20' AS date)), 
+(3, 'cancel', CAST('2-15-20' AS date)), 
+(4, 'start', CAST('2-18-20' AS date)), 
+(1, 'publish', CAST('2-19-20' AS date))),
+
+t1 AS (
+SELECT *, ROW_NUMBER () OVER (PARTITION BY user_id ORDER BY action_date DESC) AS date_rank
+FROM users),
+
+latest AS (
+SELECT user_id, action_date AS latest_date
+    FROM t1
+    WHERE date_rank = 1
+),
+
+next_latest AS (
+SELECT user_id, action_date AS next_latest_date
+    FROM t1
+    WHERE date_rank = 2
+)
+
+SELECT latest.user_id, latest_date - next_latest_date AS time_elapsed
+FROM latest
+LEFT JOIN next_latest
+on latest.user_id = next_latest.user_id;
+
+
+
+--------------------------------- Q5 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- A company defines its super users as those who have made at least 
+-- two transactions. From the following table, write a query to return, 
+-- for each user, the date when they become a super user, ordered by oldest super users first. 
+-- Users who are not super users should also be present in the table.
+
+-- Table as is:
+
+WITH users (user_id, product_id, transaction_date) 
+AS (VALUES 
+(1, 101, CAST('2-12-20' AS date)), 
+(2, 105, CAST('2-13-20' AS date)), 
+(1, 111, CAST('2-14-20' AS date)), 
+(3, 121, CAST('2-15-20' AS date)), 
+(1, 101, CAST('2-16-20' AS date)), 
+(2, 105, CAST('2-17-20' AS date)),
+(4, 101, CAST('2-16-20' AS date)), 
+(3, 105, CAST('2-15-20' AS date)))
+
+SELECT * 
+FROM users;
+
+--- Method 1 – Using COUNT in window function
+WITH users (user_id, product_id, transaction_date) 
+AS (VALUES 
+(1, 101, CAST('2-12-20' AS date)), 
+(2, 105, CAST('2-13-20' AS date)), 
+(1, 111, CAST('2-14-20' AS date)), 
+(3, 121, CAST('2-15-20' AS date)), 
+(1, 101, CAST('2-16-20' AS date)), 
+(2, 105, CAST('2-17-20' AS date)),
+(4, 101, CAST('2-16-20' AS date)), 
+(3, 105, CAST('2-15-20' AS date))),
+
+t1 AS (
+SELECT *, COUNT (*) OVER (
+                        PARTITION BY user_id 
+                        ORDER BY transaction_date 
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS running_total
+FROM users
+ORDER BY user_id),
+
+t2 AS (
+SELECT DISTINCT user_id, MAX(running_total) AS total
+FROM t1
+GROUP BY user_id
+ORDER BY user_id)
+
+
+SELECT t1.user_id, 
+(CASE WHEN total >= 2 THEN transaction_date END) AS super_user_date
+FROM t1
+LEFT JOIN t2
+ON t1.user_id = t2.user_id
+WHERE (running_total = 2 AND total >= 2)
+OR total <2
+ORDER BY super_user_date ASC;
+
+-- Method 2: Using ROW NUMBER in window function
+
+
+WITH users (user_id, product_id, transaction_date) 
+AS (VALUES 
+(1, 101, CAST('2-12-20' AS date)), 
+(2, 105, CAST('2-13-20' AS date)), 
+(1, 111, CAST('2-14-20' AS date)), 
+(3, 121, CAST('2-15-20' AS date)), 
+(1, 101, CAST('2-16-20' AS date)), 
+(2, 105, CAST('2-17-20' AS date)),
+(4, 101, CAST('2-16-20' AS date)), 
+(3, 105, CAST('2-15-20' AS date))),
+
+
+t1 AS (
+SELECT *, ROW_NUMBER () OVER (PARTITION BY user_id ORDER BY transaction_date)
+FROM users
+ORDER BY user_id),
+    
+t2 AS (
+SELECT user_id, transaction_date AS super_user_date
+FROM t1
+    WHERE row_number = 2
+),
+    
+t3 AS (
+SELECT DISTINCT user_id
+    FROM users
+)
+    
+SELECT t3.user_id, super_user_date
+FROM t3
+LEFT JOIN t2
+ON t3.user_id = t2.user_id
+ORDER BY super_user_date ASC
+    
+
+
+
+--------------------------------- Q6 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- Using the following two tables, write a query to return page recommendations 
+-- to a social media user based on the pages that their friends have liked, 
+-- but that they have not yet marked as liked. 
+-- Order the result by ascending user ID. Source.
+
+-- Tables as given: 
+
+WITH friends (user_id, friend) 
+AS (VALUES 
+(1, 2), (1, 3), (1, 4), (2, 1), (3, 1), (3, 4), (4, 1), (4, 3)),
+
+likes (user_id, page_likes) 
+AS (VALUES 
+(1, 'A'), (1, 'B'), (1, 'C'), (2, 'A'), (3, 'B'), (3, 'C'), (4, 'B'))
+
+SELECT * FROM friends
+SELECT * FROM likes 
+
+
+
+-- My solution 
+
+-- User likes
+
+WITH friends (user_id, friend) 
+AS (VALUES 
+(1, 2), (1, 3), (1, 4), (2, 1), (3, 1), (3, 4), (4, 1), (4, 3)),
+
+likes (user_id, page_likes) 
+AS (VALUES 
+(1, 'A'), (1, 'B'), (1, 'C'), (2, 'A'), (3, 'B'), (3, 'C'), (4, 'B')),
+
+user_likes AS (
+    SELECT DISTINCT f.user_id, l.page_likes AS user_likes
+    FROM friends AS f
+    JOIN likes AS l
+    ON f.user_id = l.user_id
+    ORDER BY f.user_id
+    ),
+
+-- for each user, select all pages liked by any friend
+friend_likes AS (
+    SELECT DISTINCT f.user_id, l.page_likes AS friend_likes
+    FROM friends AS f
+    JOIN likes AS l
+    ON f.friend = l.user_id
+    ORDER BY user_id
+)
+
+SELECT f.user_id, 
+        CASE WHEN friend_likes NOT IN 
+            (SELECT user_likes
+            FROM user_likes
+            WHERE user_likes.user_id = f.user_id) THEN f.friend_likes END AS recommendation
+FROM friend_likes AS f
+WHERE CASE WHEN friend_likes NOT IN 
+            (SELECT user_likes
+            FROM user_likes
+            WHERE user_likes.user_id = f.user_id) THEN f.friend_likes END IS NOT NULL
+
+
+-- Author's solution
+
+WITH friends (user_id, friend) 
+AS (VALUES 
+(1, 2), (1, 3), (1, 4), (2, 1), (3, 1), (3, 4), (4, 1), (4, 3)),
+
+likes (user_id, page_likes) 
+AS (VALUES 
+(1, 'A'), (1, 'B'), (1, 'C'), (2, 'A'), (3, 'B'), (3, 'C'), (4, 'B')),
+
+-- inner join friends and page likes tables on user_id
+
+t1 AS (
+SELECT 
+   l.user_id, 
+   l.page_likes, 
+   f.friend
+FROM likes l
+JOIN friends f
+ON l.user_id = f.user_id),
+
+-- left join likes on this, requiring user = friend and user likes = friend likes 
+
+t2 AS (
+SELECT 
+   t1.user_id,
+   t1.page_likes, 
+   t1.friend, 
+   l.page_likes AS friend_likes
+FROM t1
+LEFT JOIN likes l
+ON t1.friend = l.user_id
+AND t1.page_likes = l.page_likes)
+
+-- if a friend pair doesn’t share a common page like, friend likes column will be null - pull out these entries 
+SELECT DISTINCT 
+   friend AS user_id, 
+   page_likes AS recommended_page
+FROM t2
+WHERE friend_likes IS NULL
+ORDER BY 1
+
+
+
+
+--------------------------------- Q7 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 7. Mobile and web visitors
+-- With the following two tables, return the fraction of users who only 
+-- visited mobile, only visited web, and visited both.
+
+-- Tables as given: 
+
+WITH mobile (user_id, page_url) 
+AS (VALUES 
+(1, 'A'), (2, 'B'), (3, 'C'), (4, 'A'), (9, 'B'), (2, 'C'), (10, 'B')),
+
+web (user_id, page_url) 
+AS (VALUES 
+(6, 'A'), (2, 'B'), (3, 'C'), (7, 'A'), (4, 'B'), (8, 'C'), (5, 'B'))
+
+SELECT * 
+FROM mobile
+
+SELECT *
+FROM web
+
+-- My solution: 
+WITH mobile (user_id, page_url) 
+AS (VALUES 
+(1, 'A'), (2, 'B'), (3, 'C'), (4, 'A'), (9, 'B'), (2, 'C'), (10, 'B')),
+
+web (user_id, page_url) 
+AS (VALUES 
+(6, 'A'), (2, 'B'), (3, 'C'), (7, 'A'), (4, 'B'), (8, 'C'), (5, 'B')),
+
+mobile_only AS (
+SELECT user_id AS mobile_user_id, COUNT (page_url) AS mobile_count
+FROM mobile
+GROUP BY user_id
+ORDER BY user_id),
+
+web_only AS (
+SELECT user_id AS web_user_id, COUNT (page_url) AS web_count
+FROM web
+GROUP BY user_id
+ORDER BY user_id
+),
+
+t1 AS (
+SELECT *
+FROM mobile_only AS m
+FULL OUTER JOIN web_only AS w
+ON m.mobile_user_id = w.web_user_id),
+
+t2 AS (
+SELECT COUNT (CASE WHEN web_count IS NULL THEN mobile_user_id END) AS only_mobile,
+        COUNT (CASE WHEN mobile_count IS NULL THEN web_user_id END) AS only_web,
+        COUNT (CASE WHEN web_count IS NOT NULL AND mobile_count IS NOT NULL THEN mobile_user_id END) AS both_formats
+FROM t1)
+
+SELECT ROUND (1.0 * only_mobile / (only_mobile + only_web + both_formats), 2) AS only_mobile_fraction, 
+        ROUND (1.0 * only_web / (only_mobile + only_web + both_formats), 2) AS only_web_fraction,
+        ROUND (1.0 * both_formats / (only_mobile + only_web + both_formats), 2) AS both_fraction
+FROM t2
+        
+
+-- Alternative, much faster solution
+
+WITH mobile (user_id, page_url) 
+AS (VALUES 
+(1, 'A'), (2, 'B'), (3, 'C'), (4, 'A'), (9, 'B'), (2, 'C'), (10, 'B')),
+
+web (user_id, page_url) 
+AS (VALUES 
+(6, 'A'), (2, 'B'), (3, 'C'), (7, 'A'), (4, 'B'), (8, 'C'), (5, 'B')),
+
+t1 AS (
+SELECT DISTINCT m.user_id AS mobile_user, w.user_id AS web_user
+FROM mobile AS m
+FULL JOIN web AS w
+ON m.user_id = w.user_id)
+
+SELECT ROUND (AVG (CASE WHEN web_user IS NULL THEN 1 ELSE 0 END), 2) AS mobile_only,
+        ROUND (AVG (CASE WHEN mobile_user IS NULL THEN 1 ELSE 0 END),2) AS web_only,
+        ROUND (AVG (CASE WHEN web_user IS NOT NULL AND mobile_user IS NOT NULL THEN 1 ELSE 0 END), 2) AS both_platforms 
+FROM t1
+
+--------------------------------- Q8 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 8. Upgrade rate by product action (hard)
+-- Given the following two tables, return the fraction of users, 
+-- rounded to two decimal places, who accessed feature two (type: F2 in events table) 
+-- and upgraded to premium within the first 30 days of signing up.
+
+-- Tables as given: 
+
+WITH users (user_id, name, join_date) 
+AS (VALUES 
+(1, 'Jon', CAST('2-14-20' AS date)), 
+(2, 'Jane', CAST('2-14-20' AS date)), 
+(3, 'Jill', CAST('2-15-20' AS date)), 
+(4, 'Josh', CAST('2-15-20' AS date)), 
+(5, 'Jean', CAST('2-16-20' AS date)), 
+(6, 'Justin', CAST('2-17-20' AS date)),
+(7, 'Jeremy', CAST('2-18-20' AS date))),
+
+events (user_id, type, access_date) 
+AS (VALUES 
+(1, 'F1', CAST('3-1-20' AS date)), 
+(2, 'F2', CAST('3-2-20' AS date)), 
+(2, 'P', CAST('3-12-20' AS date)),
+(3, 'F2', CAST('3-15-20' AS date)), 
+(4, 'F2', CAST('3-15-20' AS date)), 
+(1, 'P', CAST('3-16-20' AS date)), 
+(3, 'P', CAST('3-22-20' AS date)))
+
+SELECT *
+FROM users
+
+SELECT * 
+FROM events
+
+
+-- My solution
+
+WITH users (user_id, name, join_date) 
+AS (VALUES 
+(1, 'Jon', CAST('2-14-20' AS date)), 
+(2, 'Jane', CAST('2-14-20' AS date)), 
+(3, 'Jill', CAST('2-15-20' AS date)), 
+(4, 'Josh', CAST('2-15-20' AS date)), 
+(5, 'Jean', CAST('2-16-20' AS date)), 
+(6, 'Justin', CAST('2-17-20' AS date)),
+(7, 'Jeremy', CAST('2-18-20' AS date))),
+
+events (user_id, type, access_date) 
+AS (VALUES 
+(1, 'F1', CAST('3-1-20' AS date)), 
+(2, 'F2', CAST('3-2-20' AS date)), 
+(2, 'P', CAST('3-12-20' AS date)),
+(3, 'F2', CAST('3-15-20' AS date)), 
+(4, 'F2', CAST('3-15-20' AS date)), 
+(1, 'P', CAST('3-16-20' AS date)), 
+(3, 'P', CAST('3-22-20' AS date))),
+
+f2_date AS (
+
+    SELECT user_id, access_date AS f2_date
+    FROM events
+    WHERE type = 'F2'
+),
+
+p_date AS (
+    SELECT user_id, access_date AS p_date
+    FROM events
+    WHERE type = 'P'
+),
+
+t1 AS (
+SELECT u.user_id, u.join_date, f2.f2_date, p.p_date, p.p_date - u.join_date AS upgrade_time
+FROM users AS u
+LEFT JOIN f2_date AS f2
+ON u.user_id = f2.user_id
+LEFT JOIN p_date AS p
+ON u.user_id = p.user_id
+),
+
+-- Now select users who did ever use Feature 2
+t2 AS (
+SELECT *
+FROM t1
+WHERE f2_date IS NOT NULL
+)
+
+-- Now of the users who did ever use Feature 2
+-- What fraction of them upgraded to premium within 30 days?
+SELECT ROUND (AVG (CASE WHEN p_date IS NOT NULL AND upgrade_time <30 THEN 1 ELSE 0 END) , 2)
+FROM t2
+
+
+
+-- Author's solution (slightly different, but I think mine is better)
+
+WITH users (user_id, name, join_date) 
+AS (VALUES 
+(1, 'Jon', CAST('2-14-20' AS date)), 
+(2, 'Jane', CAST('2-14-20' AS date)), 
+(3, 'Jill', CAST('2-15-20' AS date)), 
+(4, 'Josh', CAST('2-15-20' AS date)), 
+(5, 'Jean', CAST('2-16-20' AS date)), 
+(6, 'Justin', CAST('2-17-20' AS date)),
+(7, 'Jeremy', CAST('2-18-20' AS date))),
+
+events (user_id, type, access_date) 
+AS (VALUES 
+(1, 'F1', CAST('3-1-20' AS date)), 
+(2, 'F2', CAST('3-2-20' AS date)), 
+(2, 'P', CAST('3-12-20' AS date)),
+(3, 'F2', CAST('3-15-20' AS date)), 
+(4, 'F2', CAST('3-15-20' AS date)), 
+(1, 'P', CAST('3-16-20' AS date)), 
+(3, 'P', CAST('3-22-20' AS date))),
+
+-- get feature 2 users and their date of feature 2 access
+t1 AS (
+SELECT 
+   user_id, 
+   type, 
+   access_date AS f2_date
+FROM events
+WHERE type = 'F2' ), 
+
+-- get premium users and their date of premium upgrade
+t2 AS (
+SELECT 
+   user_id, 
+   type, 
+   access_date AS premium_date
+FROM events
+WHERE type = 'P' ),
+
+
+-- for each feature 2 user, get time between joining and premium upgrade 
+-- (or null if no upgrade) by inner joining full users table with feature 2 users 
+-- on user ID and left joining premium users on user ID, then subtracting premium upgrade date 
+-- from join date
+t3 AS (
+SELECT t2.premium_date - u.join_date AS upgrade_time
+FROM users u
+JOIN t1
+ON u.user_id = t1.user_id
+LEFT JOIN t2
+ON u.user_id = t2.user_id )
+
+-- calculate fraction of users with upgrade time less than 30 days as average 
+-- of values (ones and zeros) specified in case statement condition, rounding to two decimal places
+ 
+SELECT 
+   ROUND(AVG(CASE WHEN upgrade_time < 30 THEN 1 ELSE 0 END), 2) AS upgrade_rate
+FROM t3
+
+
+--------------------------------- Q9 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 9. Most friended
+-- Given the following table, return a list of users and their corresponding friend count. 
+-- Order the result by descending friend count, and in the case of a tie, by ascending user ID. 
+-- Assume that only unique friendships are displayed
+-- (i.e., [1, 2] will not show up again as [2, 1] ). 
+
+
+-- Table as given:
+WITH friends (user1, user2) 
+AS (VALUES (1, 2), (1, 3), (1, 4), (2, 3)),
+
+SELECT * 
+FROM friends
+
+
+-- My solution: 
+WITH friends (user1, user2) 
+AS (VALUES (1, 2), (1, 3), (1, 4), (2, 3)),
+
+c1 AS (
+SELECT user1, user2 
+FROM friends
+UNION ALL
+SELECT user2, user1
+FROM friends
+)
+
+SELECT user1, COUNT (user2)
+FROM c1
+GROUP BY user1
+ORDER BY COUNT (user2) DESC, user1
+
+
+--------------------------------- Q10 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+--10. Project aggregation (hard)
+-- The projects table contains three columns: task_id, start_date, and end_date. 
+-- The difference between end_date and start_date is 1 day for each row in the table. 
+-- If task end dates are consecutive they are part of the same project. 
+-- Projects do not overlap.
+
+--Write a query to return the start and end dates of each project, 
+-- and the number of days it took to complete. Order by ascending project duration, 
+-- and ascending start date in the case of a tie. From HackerRank.
+
+
+-- Table as given: 
+
+WITH projects (task_id, start_date, end_date) 
+AS (VALUES 
+(1, CAST('10-01-20' AS date), CAST('10-02-20' AS date)), 
+(2, CAST('10-02-20' AS date), CAST('10-03-20' AS date)), 
+(3, CAST('10-03-20' AS date), CAST('10-04-20' AS date)), 
+(4, CAST('10-13-20' AS date), CAST('10-14-20' AS date)), 
+(5, CAST('10-14-20' AS date), CAST('10-15-20' AS date)), 
+(6, CAST('10-28-20' AS date), CAST('10-29-20' AS date)), 
+(7, CAST('10-30-20' AS date), CAST('10-31-20' AS date)))
+
+SELECT *
+FROM projects
+
+-- My solution
+
+WITH projects (task_id, start_date, end_date) 
+AS (VALUES 
+(1, CAST('10-01-20' AS date), CAST('10-02-20' AS date)), 
+(2, CAST('10-02-20' AS date), CAST('10-03-20' AS date)), 
+(3, CAST('10-03-20' AS date), CAST('10-04-20' AS date)), 
+(4, CAST('10-13-20' AS date), CAST('10-14-20' AS date)), 
+(5, CAST('10-14-20' AS date), CAST('10-15-20' AS date)), 
+(6, CAST('10-28-20' AS date), CAST('10-29-20' AS date)), 
+(7, CAST('10-30-20' AS date), CAST('10-31-20' AS date))),
+
+-- Select true start_dates for the projects
+-- These are the start_dates that don't appear in the end_date column
+
+t1 AS (
+SELECT start_date AS project_start_date
+FROM projects
+WHERE start_date NOT IN (SELECT end_date FROM projects)
+),
+
+
+-- Select true end_dates for the projects
+-- These are the ones not in the start_date column
+
+t2 AS (
+    SELECT end_date AS project_end_date
+    FROM projects
+    WHERE end_date NOT IN (SELECT start_date FROM projects)
+),
+
+-- Now add row number to t1:
+
+t3 AS (
+SELECT *, ROW_NUMBER() OVER (ORDER BY project_start_date)
+FROM t1),
+
+t4 AS (
+    SELECT *, ROW_NUMBER() OVER (ORDER BY project_end_date)
+    FROM t2
+)
+
+SELECT project_start_date, project_end_date, project_end_date-project_start_date AS project_duration
+FROM t3
+LEFT JOIN t4
+ON t3.row_number = t4.row_number
+ORDER BY project_duration, project_start_date
+
+--------------------------------- Q11 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 11. Birthday attendance
+-- Given the following two tables, write a query to return the fraction of students, 
+-- rounded to two decimal places, who attended school
+-- (attendance = 1) on their birthday. 
+
+WITH attendance (student_id, school_date, attendance)
+AS (VALUES
+(1, CAST('2020-04-03' AS date), 0),
+(2, CAST('2020-04-03' AS date), 1),
+(3, CAST('2020-04-03' AS date), 1), 
+(1, CAST('2020-04-04' AS date), 1), 
+(2, CAST('2020-04-04' AS date), 1), 
+(3, CAST('2020-04-04' AS date), 1), 
+(1, CAST('2020-04-05' AS date), 0), 
+(2, CAST('2020-04-05' AS date), 1), 
+(3, CAST('2020-04-05' AS date), 1), 
+(4, CAST('2020-04-05' AS date), 1)),
+
+students (student_id, school_id, grade_level, date_of_birth)
+AS (VALUES
+(1, 2, 5, CAST('2012-04-03' AS date)),
+(2, 1, 4, CAST('2013-04-04' AS date)),
+(3, 1, 3, CAST('2014-04-05' AS date)), 
+(4, 2, 4, CAST('2013-04-03' AS date))),
+
+birthdays AS (
+    SELECT student_id, date_of_birth
+    FROM students
+),
+
+
+t1 AS (
+SELECT a.student_id, a.school_date, s.date_of_birth, a.attendance
+FROM attendance AS a
+LEFT JOIN students AS s
+ON a.student_id = s.student_id
+WHERE EXTRACT(MONTH FROM a.school_date) = EXTRACT (MONTH FROM s.date_of_birth)
+AND EXTRACT(DAY FROM a.school_date) = EXTRACT (DAY FROM s.date_of_birth)
+ORDER BY a.student_id, a.school_date)
+
+SELECT ROUND (AVG(attendance),2) AS birthdate_attendance
+FROM t1
+
+
+-- Solution with a single query: 
+WITH attendance (student_id, school_date, attendance)
+AS (VALUES
+(1, CAST('2020-04-03' AS date), 0),
+(2, CAST('2020-04-03' AS date), 1),
+(3, CAST('2020-04-03' AS date), 1), 
+(1, CAST('2020-04-04' AS date), 1), 
+(2, CAST('2020-04-04' AS date), 1), 
+(3, CAST('2020-04-04' AS date), 1), 
+(1, CAST('2020-04-05' AS date), 0), 
+(2, CAST('2020-04-05' AS date), 1), 
+(3, CAST('2020-04-05' AS date), 1), 
+(4, CAST('2020-04-05' AS date), 1)),
+
+students (student_id, school_id, grade_level, date_of_birth)
+AS (VALUES
+(1, 2, 5, CAST('2012-04-03' AS date)),
+(2, 1, 4, CAST('2013-04-04' AS date)),
+(3, 1, 3, CAST('2014-04-05' AS date)), 
+(4, 2, 4, CAST('2013-04-03' AS date)))
+
+SELECT ROUND (AVG(attendance),2) AS birthday_attendance
+FROM attendance AS a
+LEFT JOIN students AS s
+ON a.student_id = s.student_id
+WHERE EXTRACT(MONTH FROM a.school_date) = EXTRACT (MONTH FROM s.date_of_birth)
+AND EXTRACT(DAY FROM a.school_date) = EXTRACT (DAY FROM s.date_of_birth)
+
+--------------------------------- Q12 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 12. Hacker scores
+-- Given the following two tables, write a query to return the 
+-- hacker ID, name, and total score (the sum of maximum scores for each challenge completed) 
+-- ordered by descending score, and by ascending hacker ID in the case of score tie. 
+-- Do not display entries for hackers with a score of zero. From HackerRank.
+
+
+
+-- Solution 1
+WITH hackers (hacker_id, name)
+AS (VALUES
+(1, 'John'),
+(2, 'Jane'),
+(3, 'Joe'),
+(4, 'Jim')),
+
+submissions (submission_id, hacker_id, challenge_id, score)
+AS (VALUES
+(101, 1, 1, 10),
+(102, 1, 1, 12),
+(103, 2, 1, 11),
+(104, 2, 1, 9),
+(105, 2, 2, 13),
+(106, 3, 1, 9),
+(107, 3, 2, 12),
+(108, 3, 2, 15),
+(109, 4, 1, 0)),
+
+t1 AS (
+SELECT hacker_id, challenge_id, MAX (score) AS max_score
+FROM submissions
+GROUP BY hacker_id, challenge_id
+ORDER BY hacker_id
+),
+
+t2 AS (
+SELECT hacker_id, SUM (max_score)
+FROM t1
+GROUP BY hacker_id
+HAVING SUM(max_score) != 0
+)
+
+SELECT h.hacker_id, h.name AS hacker_name, t2.sum
+FROM hackers AS h
+JOIN t2
+ON h.hacker_id = t2.hacker_id
+ORDER BY sum DESC, hacker_id 
+
+
+-- Solution 2 –– As solution 1, but with one step fewer
+WITH hackers (hacker_id, name)
+AS (VALUES
+(1, 'John'),
+(2, 'Jane'),
+(3, 'Joe'),
+(4, 'Jim')),
+
+submissions (submission_id, hacker_id, challenge_id, score)
+AS (VALUES
+(101, 1, 1, 10),
+(102, 1, 1, 12),
+(103, 2, 1, 11),
+(104, 2, 1, 9),
+(105, 2, 2, 13),
+(106, 3, 1, 9),
+(107, 3, 2, 12),
+(108, 3, 2, 15),
+(109, 4, 1, 0)),
+
+t1 AS (
+SELECT hacker_id, challenge_id, MAX (score) AS max_score
+FROM submissions
+GROUP BY hacker_id, challenge_id
+ORDER BY hacker_id
+)
+
+SELECT h.hacker_id, h.name AS hacker_name, SUM(max_score)
+FROM hackers AS h
+JOIN t1
+ON h.hacker_id = t1.hacker_id
+GROUP BY h.hacker_id, h.name
+HAVING SUM(max_score) != 0
+ORDER BY SUM(max_score) DESC, hacker_id
+
+
+--------------------------------- Q13 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 13. Rank without RANK (hard)
+-- Write a query to rank scores in the following table without using a window function. 
+-- If there is a tie between two scores, both should have the same rank. 
+-- After a tie, the following rank should be the next consecutive integer value. From LeetCode.
+
+
+-- Table as given
+WITH scores (id, score)
+AS (VALUES
+(1, 3.50),
+(2, 3.65),
+(3, 4.00),
+(4, 3.85),
+(5, 4.00),
+(6, 3.65))
+
+SELECT *
+FROM scores
+
+
+
+-- My solution
+WITH scores (id, score)
+AS (VALUES
+(1, 3.50),
+(2, 3.65),
+(3, 4.00),
+(4, 3.85),
+(5, 4.00),
+(6, 3.65)),
+
+distinct_scores AS (
+SELECT DISTINCT s.score
+FROM scores AS s)
+
+SELECT s.score, (SELECT COUNT(score) FROM distinct_scores WHERE score > s.score)+1 AS ranking
+FROM scores AS s
+ORDER BY ranking
+
+-- Author's solution
+
+WITH scores (id, score)
+AS (VALUES
+(1, 3.50),
+(2, 3.65),
+(3, 4.00),
+(4, 3.85),
+(5, 4.00),
+(6, 3.65))
+
+-- self-join on inequality produces a table with one score and all scores 
+-- as large as this joined to it, grouping by first id and score, and counting up 
+-- all unique values of joined scores yields the equivalent of DENSE_RANK()   
+-- [check join output to understand]
+
+SELECT s1.score, COUNT (DISTINCT s2.score) AS score_rank
+FROM scores s1
+JOIN scores s2
+ON s1.score <= s2.score
+GROUP BY s1.score
+ORDER BY score DESC
+
+--------------------------------- Q14 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 14. Cumulative salary sum
+-- The following table holds monthly salary information for several employees. 
+-- Write a query to get, for each month, the cumulative sum of an employee’s salary 
+-- over a period of 3 months, excluding the most recent month. 
+-- The result should be ordered by ascending employee ID and month. From LeetCode.
+
+
+-- Table as given
+WITH employee (id, pay_month, salary)
+AS (VALUES
+(1, 1, 20),
+(2, 1, 20),
+(1, 2, 30),
+(2, 2, 30),
+(3, 2, 40),
+(1, 3, 40),
+(3, 3, 60),
+(1, 4, 60),
+(3, 4, 70))
+
+SELECT *
+FROM employee
+
+
+-- Honestly, I can't really tell what this question is asking me. I'm gonna skip it for now. 
+
+--------------------------------- Q15 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 15. Team standings
+-- Write a query to return the scores of each team in the teams table 
+-- after all matches displayed in the matches table. Points are awarded as follows: 
+-- zero points for a loss, one point for a tie, and three points for a win. 
+-- The result should include team name and points, and be ordered by decreasing points. 
+-- In case of a tie, order by alphabetized team name.
+
+
+-- My solution
+
+WITH teams (team_id, team_name)
+AS (VALUES
+(1, 'New York'),
+(2, 'Atlanta'),
+(3, 'Chicago'),
+(4, 'Toronto'),
+(5, 'Los Angeles'),
+(6, 'Seattle')),
+
+matches (match_id, host_team, guest_team, host_goals, guest_goals)
+AS (VALUES
+(1, 1, 2, 3, 0),
+(2, 2, 3, 2, 4),
+(3, 3, 4, 4, 3),
+(4, 4, 5, 1, 1),
+(5, 5, 6, 2, 1),
+(6, 6, 1, 1, 2)),
+
+outcomes AS (
+SELECT host_team, guest_team, 
+        (CASE WHEN host_goals > guest_goals THEN 1 ELSE 0 END) AS host_win,
+        (CASE WHEN host_goals < guest_goals THEN 1 ELSE 0 END) AS guest_win,
+        (CASE WHEN host_goals = guest_goals THEN 1 ELSE 0 END) AS draw
+FROM matches
+),
+
+-- table for host wins
+teams_1 AS (
+    SELECT host_team, host_win * 3 + draw * 1 AS points
+    FROM outcomes
+),
+
+-- table for guest wins
+teams_2 AS (
+    SELECT guest_team, guest_win * 3 + draw * 1 AS points
+    FROM outcomes
+)
+
+
+-- join host win table + guest win table + table with team names
+SELECT teams.team_name, t1.points + t2.points AS total_points
+FROM teams_1 AS t1
+JOIN teams_2 AS t2
+ON t1.host_team = t2.guest_team
+LEFT JOIN teams ON t1.host_team = teams.team_id
+ORDER BY total_points DESC, team_name
+    
+    
+
+-- Alternative solution 
+WITH teams (team_id, team_name)
+AS (VALUES
+(1, 'New York'),
+(2, 'Atlanta'),
+(3, 'Chicago'),
+(4, 'Toronto'),
+(5, 'Los Angeles'),
+(6, 'Seattle')),
+
+matches (match_id, host_team, guest_team, host_goals, guest_goals)
+AS (VALUES
+(1, 1, 2, 3, 0),
+(2, 2, 3, 2, 4),
+(3, 3, 4, 4, 3),
+(4, 4, 5, 1, 1),
+(5, 5, 6, 2, 1),
+(6, 6, 1, 1, 2)),
+
+t1 AS (
+
+    SELECT *,
+    CASE WHEN host_goals > guest_goals THEN 3
+         WHEN host_goals = guest_goals THEN 1
+         WHEN host_goals < guest_goals THEN 0 END AS host_points,
+    CASE WHEN host_goals < guest_goals THEN 3
+         WHEN host_goals = guest_goals THEN 1
+         WHEN host_goals > guest_goals THEN 0 END AS guest_points
+    FROM matches AS m
+)
+
+SELECT teams.team_name, a.host_points + b.guest_points AS total_points
+FROM teams
+LEFT JOIN t1 AS a ON teams.team_id = a.host_team
+LEFT JOIN t1 AS b ON teams.team_id = b.guest_team
+ORDER BY total_points DESC, team_name
+
+
+--------------------------------- Q16 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 16. Customers who didn’t buy a product
+
+-- From the following table, write a query to display the ID and name 
+-- of customers who bought products A and B, but didn’t buy product C, 
+-- ordered by ascending customer ID.
+
+WITH customers (id, name)
+AS (VALUES
+(1, 'Daniel'),
+(2, 'Diana'),
+(3, 'Elizabeth'),
+(4, 'John')),
+
+orders (order_id, customer_id, product_name)
+AS (VALUES
+(1, 1, 'A'),
+(2, 1, 'B'),
+(3, 2, 'A'),
+(4, 2, 'B'),
+(5, 2, 'C'),
+(6, 3, 'A'), 
+(7, 3, 'A'),
+(8, 3, 'B'),
+(9, 3, 'D')),
+
+-- select customers who bought both A and B, and DID NOT buy C
+t1 AS (
+SELECT DISTINCT o.customer_id
+FROM orders AS o
+WHERE 'A' IN (SELECT product_name FROM orders WHERE customer_id = o.customer_id)
+AND 'B' IN (SELECT product_name FROM orders WHERE customer_id = o.customer_id)
+AND 'C' NOT IN (SELECT product_name FROM orders WHERE customer_id = o.customer_id)
+)
+
+SELECT t1.customer_id, customers.name
+FROM t1
+LEFT JOIN customers 
+ON t1.customer_id = customers.id
+ORDER BY t1.customer_id
+
+
+-- I guess you could have joined the t1 with the last query. 
+
+
+
+--------------------------------- Q17 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 17. Median latitude (hard)
+-- Write a query to return the median latitude of weather stations from each state 
+-- in the following table, rounding to the nearest tenth of a degree. 
+-- Note that there is no MEDIAN() function in SQL! From HackerRank.
+
+
+-- Table as given: 
+WITH stations (id, city, state, latitude, longitude)
+AS (VALUES
+(1, 'Asheville', 'North Carolina', 35.6, 82.6),
+(2, 'Burlington', 'North Carolina', 36.1, 79.4),
+(3, 'Chapel Hill', 'North Carolina', 35.9, 79.1),
+(4, 'Davidson', 'North Carolina', 35.5, 80.8),
+(5, 'Elizabeth City', 'North Carolina', 36.3, 76.3),
+(6, 'Fargo', 'North Dakota', 46.9, 96.8),
+(7, 'Grand Forks', 'North Dakota', 47.9, 97.0),
+(8, 'Hettinger', 'North Dakota', 46.0, 102.6),
+(9, 'Inkster', 'North Dakota', 48.2, 97.6))
+
+SELECT *
+FROM stations
+
+
+-- My solution: 
+
+WITH stations (id, city, state, latitude, longitude)
+AS (VALUES
+(1, 'Asheville', 'North Carolina', 35.6, 82.6),
+(2, 'Burlington', 'North Carolina', 36.1, 79.4),
+(3, 'Chapel Hill', 'North Carolina', 35.9, 79.1),
+(4, 'Davidson', 'North Carolina', 35.5, 80.8),
+(5, 'Elizabeth City', 'North Carolina', 36.3, 76.3),
+(6, 'Fargo', 'North Dakota', 46.9, 96.8),
+(7, 'Grand Forks', 'North Dakota', 47.9, 97.0),
+(8, 'Hettinger', 'North Dakota', 46.0, 102.6),
+(9, 'Inkster', 'North Dakota', 48.2, 97.6)),
+
+
+-- Assign row numbers using window function
+t1 AS (
+SELECT *, ROW_NUMBER() OVER (PARTITION BY state ORDER BY latitude) AS row_number
+FROM stations
+),
+
+t2 AS (
+SELECT *, MAX (row_number) OVER (PARTITION BY state) AS max_row_number
+FROM t1
+)
+
+SELECT DISTINCT x.state, 
+        CASE WHEN MOD (max_row_number, 2) = 0 THEN  ROUND ((SELECT AVG (latitude)
+                                                     FROM t2 
+                                                     WHERE state = x.state 
+                                                     AND (row_number = max_row_number / 2 OR row_number = 1+ (max_row_number/2))
+                                                     ) ,1)
+                                                     
+             WHEN MOD (max_row_number, 2) = 1 THEN ROUND ((SELECT latitude
+                                                     FROM t2 
+                                                     WHERE state = x.state 
+                                                     AND (row_number = 1 + max_row_number / 2 )), 1) END AS median_latitude
+FROM t2 AS x
+
+
+-- Author's more elegant solution
+-- The trick is to realise that to get the median, you can simply take the average of 
+-- all values with row number >= 1.0 * (max_row_number / 2) 
+-- and row number <= 1.0* (max_row_number/2) + 1
+
+WITH stations (id, city, state, latitude, longitude)
+AS (VALUES
+(1, 'Asheville', 'North Carolina', 35.6, 82.6),
+(2, 'Burlington', 'North Carolina', 36.1, 79.4),
+(3, 'Chapel Hill', 'North Carolina', 35.9, 79.1),
+(4, 'Davidson', 'North Carolina', 35.5, 80.8),
+(5, 'Elizabeth City', 'North Carolina', 36.3, 76.3),
+(6, 'Fargo', 'North Dakota', 46.9, 96.8),
+(7, 'Grand Forks', 'North Dakota', 47.9, 97.0),
+(8, 'Hettinger', 'North Dakota', 46.0, 102.6),
+(9, 'Inkster', 'North Dakota', 48.2, 97.6)),
+
+t1 AS (
+SELECT *, ROW_NUMBER() OVER (PARTITION BY state ORDER BY latitude), COUNT (*) OVER (PARTITION BY state) AS total_rows
+FROM stations
+)
+
+SELECT *
+FROM t1
+
+
+SELECT DISTINCT state, AVG(latitude) OVER (PARTITION BY state) AS median_latitude
+FROM t1
+WHERE row_number >= 1.0 * (total_rows/2)
+AND row_number <= (1.0 * (total_rows/2)) + 1
+
+
+
+
+
+--------------------------------- Q18 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+
+-- 18. Maximally-separated cities
+-- From the same table in question 17, write a query to return the furthest-separated pair 
+-- of cities for each state, and the corresponding distance (in degrees, rounded to 2 decimal places) 
+-- between those two cities. From HackerRank.
+
+WITH stations (id, city, state, latitude, longitude)
+AS (VALUES
+(1, 'Asheville', 'North Carolina', 35.6, 82.6),
+(2, 'Burlington', 'North Carolina', 36.1, 79.4),
+(3, 'Chapel Hill', 'North Carolina', 35.9, 79.1),
+(4, 'Davidson', 'North Carolina', 35.5, 80.8),
+(5, 'Elizabeth City', 'North Carolina', 36.3, 76.3),
+(6, 'Fargo', 'North Dakota', 46.9, 96.8),
+(7, 'Grand Forks', 'North Dakota', 47.9, 97.0),
+(8, 'Hettinger', 'North Dakota', 46.0, 102.6),
+(9, 'Inkster', 'North Dakota', 48.2, 97.6)),
+
+
+-- Self join "stations" table with itself
+-- Note the inequality sign in the ON clause to get unique pairs
+t1 AS (
+SELECT x.state, x.city AS city_1, x.latitude AS city_1_lat, x.longitude AS city_1_lon, 
+        y.city AS city_2, y.latitude AS city_2_lat, y.longitude AS city_2_lon
+FROM stations AS x
+JOIN stations AS y
+ON x.state = y.state AND x.city < y.city
+)
+
+SELECT *
+FROM t1 
+
+
+
+t2 AS (
+SELECT state, city_1, city_2, ROUND (sqrt (POWER(city_1_lat - city_2_lat, 2) + POWER (city_1_lon - city_2_lon, 2)), 2) AS distance
+FROM t1
+),
+
+t3 AS (
+SELECT * , RANK () OVER (PARTITION BY state ORDER BY distance DESC)
+FROM t2
+)
+
+SELECT state, city_1, city_2, distance
+FROM t3
+WHERE rank = 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
