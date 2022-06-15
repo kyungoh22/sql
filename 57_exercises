@@ -1,0 +1,138 @@
+-- 1.
+
+SELECT *
+FROM shippers;
+
+-- 2.
+
+SELECT categoryname, description
+FROM categories;
+
+-- 3.
+
+SELECT firstname, lastname, hiredate
+FROM employees
+WHERE title = 'Sales Representative';
+
+
+-- 4.
+
+SELECT firstname, lastname, hiredate
+FROM employees
+WHERE country = 'USA'
+AND title = 'Sales Representative' ;
+
+-- 5. 
+
+SELECT *
+FROM orders
+WHERE employeeid = 5;
+
+-- 6
+
+SELECT supplierid, contactname, contacttitle
+FROM suppliers
+WHERE contacttitle != 'Marketing Manager';
+
+
+-- 7
+
+-- Use ILIKE to do case insensitive comparison
+SELECT productid, productname
+FROM products
+WHERE productname ILIKE '%queso'
+OR productname ILIKE 'queso%';
+
+-- 8
+
+SELECT orderid, customerid, shipcountry
+FROM orders
+WHERE shipcountry = 'France' 
+OR shipcountry = 'Belgium';
+
+-- 9
+SELECT orderid, customerid, shipcountry
+FROM orders
+WHERE shipcountry IN ('Brazil', 'Mexico', 'Argentina', 'Venezuela');
+
+
+-- 10
+
+SELECT firstname, lastname, title, birthdate
+FROM employees
+ORDER BY birthdate;
+
+
+-- 11
+
+SELECT firstname, lastname, title, DATE(birthdate)
+FROM employees
+ORDER BY birthdate;
+
+
+
+-- 12
+SELECT firstname, lastname, CONCAT (firstname, ' ', lastname) AS fullname
+FROM employees;
+
+-- 13
+
+SELECT orderid, productid, unitprice, quantity, unitprice * quantity AS totalprice
+FROM order_details;
+
+
+-- 14
+
+SELECT COUNT (DISTINCT customerid)
+FROM customers;
+
+-- 15
+SELECT MIN (orderdate)
+FROM orders;
+
+
+-- 16
+
+SELECT DISTINCT country
+FROM customers
+ORDER BY country;
+
+
+-- 17
+
+SELECT contacttitle, COUNT(*)
+FROM customers
+GROUP BY contacttitle
+ORDER BY count DESC;
+
+
+-- 18
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
