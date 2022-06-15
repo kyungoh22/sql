@@ -1281,16 +1281,22 @@ SELECT *, ROW_NUMBER() OVER (PARTITION BY state ORDER BY latitude), COUNT (*) OV
 FROM stations
 )
 
-SELECT *
+
+SELECT 
+            state, 
+            AVG(latitude) OVER (PARTITION BY state) AS median_latitude
 FROM t1
+WHERE row_number >= 1.0 * total_rows/2
+AND row_number <= 1.0 * total_rows/2 + 1
 
 
-SELECT DISTINCT state, AVG(latitude) OVER (PARTITION BY state) AS median_latitude
-FROM t1
-WHERE row_number >= 1.0 * (total_rows/2)
-AND row_number <= (1.0 * (total_rows/2)) + 1
 
+-- Virginia's solution
 
+SELECT state, PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY latitude)
+FROM state
+GROUP BY state
+ORDER BY state
 
 
 
@@ -1325,11 +1331,7 @@ SELECT x.state, x.city AS city_1, x.latitude AS city_1_lat, x.longitude AS city_
 FROM stations AS x
 JOIN stations AS y
 ON x.state = y.state AND x.city < y.city
-)
-
-SELECT *
-FROM t1 
-
+),
 
 
 t2 AS (
@@ -1351,13 +1353,420 @@ WHERE rank = 1
 
 
 
+--------------------------------- Q19 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+
+-- 19. Cycle time
+-- Write a query to return the average cycle time across each month. 
+-- Cycle time is the time elapsed between one user joining and their invitees joining. 
+-- Users who joined without an invitation have a zero in the “invited by” column.
+
+-- My solution
+WITH users (user_id, join_date, invited_by) 
+AS (VALUES 
+(1, CAST('01-01-20' AS date), 0), 
+(2, CAST('01-10-20' AS date), 1), 
+(3, CAST('02-05-20' AS date), 2), 
+(4, CAST('02-12-20' AS date), 3), 
+(5, CAST('02-25-20' AS date), 2), 
+(6, CAST('03-01-20' AS date), 0), 
+(7, CAST('03-01-20' AS date), 4),
+(8, CAST('03-04-20' AS date), 7)),
+
+-- perform inner self join to select users who 
+-- joined after being invited
+-- (users who joined without being invited are left out)
+
+t1 AS (
+SELECT x1.user_id, x1.join_date, x2.user_id AS invitee_id, 
+        x2.join_date AS invitee_join_date,
+        x2.join_date - x1.join_date AS cycle_time
+FROM users AS x1
+JOIN users AS x2
+ON x1.user_id = x2.invited_by
+)
+
+SELECT 
+DISTINCT EXTRACT (MONTH FROM join_date),
+ROUND (AVG(cycle_time) OVER (PARTITION BY EXTRACT(MONTH FROM join_date)) ,1) AS avg_cycle_time
+FROM t1
+ORDER BY 1
+
+-- Author's solution
+
+WITH users (user_id, join_date, invited_by) 
+AS (VALUES 
+(1, CAST('01-01-20' AS date), 0), 
+(2, CAST('01-10-20' AS date), 1), 
+(3, CAST('02-05-20' AS date), 2), 
+(4, CAST('02-12-20' AS date), 3), 
+(5, CAST('02-25-20' AS date), 2), 
+(6, CAST('03-01-20' AS date), 0), 
+(7, CAST('03-01-20' AS date), 4),
+(8, CAST('03-04-20' AS date), 7)),
+
+-- self-join on invited by = user ID, extract join month from inviter join date, and calculate cycle time as difference between join dates of inviter and invitee
+t1 AS (
+SELECT 
+   CAST(EXTRACT(MONTH FROM u2.join_date) AS int) AS month,
+   u1.join_date - u2.join_date AS cycle_time
+FROM users u1
+JOIN users u2
+ON u1.invited_by = u2.user_id )
+
+-- group by join month, take average of cycle times within each month
+SELECT 
+   month, 
+   AVG(cycle_time) AS cycle_time_month_avg
+FROM t1
+GROUP BY 1
+ORDER BY 1
+
+
+--------------------------------- Q20 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 20. Three in a row
+-- The attendance table logs the number of people counted in a crowd 
+-- each day an event is held. Write a query to return a table showing 
+-- the date and visitor count of high-attendance periods, defined as 
+-- three consecutive entries (not necessarily consecutive dates) with 
+-- more than 100 visitors. From LeetCode.
+
+----- TRICKY QUESTION
+----- COME BACK AND TRY AGAIN LATER
+
+WITH attendance (event_date, visitors) 
+AS (VALUES 
+(CAST('01-01-20' AS date), 10), 
+(CAST('01-04-20' AS date), 109), 
+(CAST('01-05-20' AS date), 150), 
+(CAST('01-06-20' AS date), 99), 
+(CAST('01-07-20' AS date), 145), 
+(CAST('01-08-20' AS date), 1455), 
+(CAST('01-11-20' AS date), 199),
+(CAST('01-12-20' AS date), 188)),
+
+t1 AS (
+SELECT *, ROW_NUMBER() OVER (ORDER BY event_date) AS day_num
+FROM attendance
+),
+
+
+t2 AS (
+    SELECT *
+    FROM t1
+    WHERE visitors > 100
+),
+
+
+t3 AS (
+SELECT a.day_num AS day_1, b.day_num AS day_2, c.day_num AS day_3
+FROM t2 AS a
+JOIN t2 AS b
+ON a.day_num = b.day_num - 1
+JOIN t2 AS c
+ON a.day_num = c.day_num - 2
+)
+
+
+SELECT event_date, visitors, day_num
+FROM t1
+WHERE day_num IN (SELECT day_1 FROM t3)
+OR day_num IN (SELECT day_2 FROM t3)
+OR day_num IN (SELECT day_3 FROM t3)
+
+--------------------------------- Q21 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 21. Commonly purchased together
+-- Using the following two tables, write a query to return the names 
+-- and purchase frequency of the top three pairs of products most often 
+-- bought together. The names of both products should appear in one column.
+
+WITH orders (order_id, customer_id, product_id) 
+AS (VALUES 
+(1, 1, 1),
+(1, 1, 2),
+(1, 1, 3),
+(2, 2, 1),
+(2, 2, 2),
+(2, 2, 4),
+(3, 1, 5)),
+
+products (id, name) 
+AS (VALUES 
+(1, 'A'),
+(2, 'B'),
+(3, 'C'),
+(4, 'D'),
+(5, 'E')),
+
+-- Self join to get all pair-wise combinations per order_id
+t1 AS (
+SELECT x1.order_id, x1.product_id AS product1, x2.product_id AS product2
+FROM orders AS x1
+JOIN orders AS x2
+ON x1.order_id = x2.order_id
+AND x1.product_id < x2.product_id
+),
+
+-- Now select the top 3 most frequently purchased pairs
+t2 AS (
+SELECT product1, product2, COUNT (*) AS num_purchases
+FROM t1
+GROUP BY product1, product2
+ORDER BY num_purchases DESC
+LIMIT 3
+),
+
+t3 AS (
+SELECT p1.name AS product1, p2.name AS product2, num_purchases
+FROM t2
+LEFT JOIN products AS p1
+ON t2.product1 = p1.id 
+LEFT JOIN products AS p2
+ON t2.product2 = p2.id
+)
+
+SELECT CONCAT ("product1", "product2") AS product_pair,
+        num_purchases
+FROM t3
+
+
+
+--------------------------------- Q22 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 22. Average treatment effect (hard)
+-- From the following table summarizing the results of a study, 
+-- calculate the average treatment effect as well as upper and lower bounds 
+-- of the 95% confidence interval. Round these numbers to 3 decimal places.
+
+
+---- Return to later
+
+
+WITH study (participant_id, assignment, outcome) 
+AS (VALUES 
+(1, 0, 0),
+(2, 1, 1),
+(3, 0, 1),
+(4, 1, 0),
+(5, 0, 1),
+(6, 1, 1),
+(7, 0, 0),
+(8, 1, 1),
+(9, 1, 1))
+
+SELECT assignment, ROUND (AVG (outcome), 3)
+FROM study
+GROUP BY assignment
 
 
 
 
 
 
+--------------------------------- Q23 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
 
+-- 23. Rolling sum salary
+-- The following table shows the monthly salary for an employee for the 
+-- first nine months in a given year. From this, write a query to return 
+-- a table that displays, for each month in the first half of the year, 
+-- the rolling sum of the employee’s salary for that month and the following 
+-- two months, ordered chronologically.
+
+WITH salaries (month, salary) 
+AS (VALUES 
+(1, 2000),
+(2, 3000),
+(3, 5000),
+(4, 4000),
+(5, 2000),
+(6, 1000),
+(7, 2000),
+(8, 4000),
+(9, 5000))
+
+SELECT month, SUM(salary) OVER (ORDER BY month ROWS BETWEEN
+                            CURRENT ROW AND 2 FOLLOWING) AS salary_3_months
+FROM salaries
+LIMIT 6
+
+
+--------------------------------- Q24 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 24. Taxi cancel rate
+-- From the given trips and users tables for a taxi service, write a query 
+-- to return the cancellation rate in the first two days in October, 
+-- rounded to two decimal places, for trips not involving banned riders 
+-- or drivers. From LeetCode.
+
+WITH trips (trip_id, rider_id, driver_id, status, request_date)
+AS (VALUES
+(1, 1, 10, 'completed', CAST('2020-10-01' AS date)),
+(2, 2, 11, 'cancelled_by_driver', CAST('2020-10-01' AS date)),
+(3, 3, 12, 'completed', CAST('2020-10-01' AS date)),
+(4, 4, 10, 'cancelled_by_rider', CAST('2020-10-02' AS date)),
+(5, 1, 11, 'completed', CAST('2020-10-02' AS date)),
+(6, 2, 12, 'completed', CAST('2020-10-02' AS date)),
+(7, 3, 11, 'completed', CAST('2020-10-03' AS date))),
+
+users (user_id, banned, type)
+AS (VALUES
+(1, 'no', 'rider'),
+(2, 'yes', 'rider'),
+(3, 'no', 'rider'),
+(4, 'no', 'rider'),
+(10, 'no', 'driver'),
+(11, 'no', 'driver'),
+(12, 'no', 'driver')),
+
+t1 AS(
+SELECT t.trip_id, t.rider_id, t.driver_id, t.status, t.request_date,
+        u1.banned AS driver_banned, u2.banned AS rider_banned
+FROM trips AS t
+LEFT JOIN users AS u1
+ON t.driver_id = u1.user_id
+LEFT JOIN users AS u2
+ON t.rider_id = u2.user_id
+ORDER BY trip_id
+),
+
+t2 AS(
+SELECT *, 
+        DENSE_RANK() OVER (ORDER BY request_date) AS day_number,
+        CASE WHEN status = 'completed' THEN 0 ELSE 1 END AS cancelled
+FROM t1
+WHERE driver_banned = 'no'
+AND rider_banned = 'no'
+)
+
+SELECT request_date, ROUND (AVG (cancelled), 1) AS cancellation_rate
+FROM t2
+WHERE day_number IN (1,2)
+GROUP BY request_date
+
+
+
+
+--------------------------------- Q25 ---------------------------------
+----------------------------------------------------------------------
+----------------------------------------------------------------------
+
+-- 25. Retention curve (hard)
+-- From the following user activity table, write a query to return 
+-- the fraction of users who are retained (show some activity) a given number 
+-- of days after joining. By convention, users are considered active on their 
+-- join day (day 0).
+
+WITH users (user_id, action_date, action) 
+AS (VALUES 
+(1, CAST('01-01-20' AS date), 'Join'), 
+(1, CAST('01-02-20' AS date), 'Access'), 
+(2, CAST('01-02-20' AS date), 'Join'), 
+(3, CAST('01-02-20' AS date), 'Join'), 
+(1, CAST('01-03-20' AS date), 'Access'), 
+(3, CAST('01-03-20' AS date), 'Access'),
+(1, CAST('01-04-20' AS date), 'Access')),
+
+-- ORDER the given table for better visibility
+t1 AS (
+SELECT *
+FROM users
+ORDER BY user_id, action_date
+),
+
+t2 AS (
+SELECT *,
+        ROW_NUMBER() OVER (PARTITION BY user_id) - 1 AS day_num
+FROM t1
+),
+
+t3 AS (
+SELECT *,
+        (SELECT COUNT (*) FROM t2 WHERE day_num = 0) AS total_users
+FROM t2
+)
+
+SELECT DISTINCT day_num,
+        (COUNT (*) OVER (PARTITION BY day_num))
+FROM t3
+ORDER BY day_num
+
+
+
+
+-- Author's solution
+
+
+WITH users (user_id, action_date, action) 
+AS (VALUES 
+(1, CAST('01-01-20' AS date), 'Join'), 
+(1, CAST('01-02-20' AS date), 'Access'), 
+(2, CAST('01-02-20' AS date), 'Join'), 
+(3, CAST('01-02-20' AS date), 'Join'), 
+(1, CAST('01-03-20' AS date), 'Access'), 
+(3, CAST('01-03-20' AS date), 'Access'),
+(1, CAST('01-04-20' AS date), 'Access')),
+
+
+-- get join dates for each user
+join_dates AS (
+SELECT 
+   user_id, 
+   action_date AS join_date
+FROM users
+WHERE action = 'Join' ),
+
+-- create vector containing all dates in date range
+date_vector AS (
+SELECT CAST(GENERATE_SERIES(MIN(action_date), MAX(action_date), 
+            '1 day'::interval) AS date) AS dates
+FROM users ),
+
+-- cross join to get all possible user-date combinations
+all_users_dates AS (
+SELECT DISTINCT 
+   user_id, 
+   d.dates
+FROM users
+CROSS JOIN date_vector d
+ORDER BY user_id, dates
+),
+
+
+-- left join users table onto all user-date combinations on matching user ID and date (null on days where user didn't engage), join onto this each user's signup date, exclude user-date combinations falling before user signup
+t1 AS (
+SELECT 
+   a.dates - c.join_date AS day_no, 
+   b.user_id
+FROM all_users_dates a
+LEFT JOIN users b
+ON a.user_id = b.user_id
+AND a.dates = b.action_date
+JOIN join_dates c
+ON a.user_id = c.user_id 
+WHERE a.dates - c.join_date >= 0 )
+
+-- grouping by days since signup, count (non-null) user IDs as active users, total users, and the quotient as retention rate
+SELECT 
+   day_no, 
+   COUNT(*) AS n_total, 
+   COUNT(DISTINCT user_id) AS n_active, 
+   ROUND(1.0*COUNT(DISTINCT user_id)/COUNT(*), 2) AS retention
+FROM t1
+GROUP BY 1
 
 
 
