@@ -1,3 +1,21 @@
+-- For database see here:
+-- https://github.com/rgerhardt/57-sql-problems
+/*
+DROP TABLE IF EXISTS customergroupthreshold;
+
+
+CREATE TABLE customergroupthreshold (
+    groupname varchar(15) NOT NULL,
+    rangebottom decimal NOT NULL,
+    rangetop decimal NOT NULL
+);
+
+INSERT INTO customergroupthreshold VALUES ('Low', 0.0000, 999.9999);
+INSERT INTO customergroupthreshold VALUES ('Medium', 1000.0000, 4999.9999);
+INSERT INTO customergroupthreshold VALUES ('High', 5000.0000, 9999.9999);
+INSERT INTO customergroupthreshold VALUES ('Very High', 10000.0000, 922337203685477.5807);
+*/
+
 -- 1.
 
 SELECT *
@@ -107,13 +125,552 @@ ORDER BY count DESC;
 
 
 -- 18
+SELECT p.productid, p.productname, s.companyname
+FROM products AS p
+LEFT JOIN suppliers AS s
+ON p.supplierid = s.supplierid;
+
+-- 19
+
+SELECT o.orderid, o.orderdate, s.companyname
+FROM orders AS o
+LEFT JOIN shippers AS s
+ON o.shipvia = s.shipperid
+WHERE o.orderid < 10300;
+
+
+-- 20
+
+SELECT c.categoryname, COUNT(*)
+FROM products AS p
+LEFT JOIN categories AS c
+ON p.categoryid = c.categoryid
+GROUP BY c.categoryid
+ORDER BY count DESC;
+
+-- 21
+
+SELECT country, city, COUNT (*)
+FROM customers
+GROUP BY country, city
+ORDER BY count DESC;
+
+
+-- 22
+SELECT productid, productname, unitsinstock, reorderlevel
+FROM products
+WHERE unitsinstock < reorderlevel
+ORDER BY productid;
+
+
+-- 23
+
+SELECT productid, productname, unitsinstock, unitsonorder, reorderlevel, discontinued
+FROM products
+WHERE unitsinstock + unitsonorder < reorderlevel
+AND discontinued = 0;
+
+
+-- 24
+
+SELECT customerid, companyname, region
+FROM customers
+ORDER BY region, customerid;
+
+
+
+-- 25
+
+SELECT shipcountry, AVG (freight) AS avg_freight_price
+FROM orders
+GROUP BY shipcountry
+ORDER BY avg_freight_price DESC
+LIMIT 3;
+
+-- 26
+
+SELECT shipcountry, AVG(freight) AS avg_freight_price
+FROM orders
+WHERE EXTRACT (YEAR FROM orderdate) = 1997
+GROUP BY shipcountry
+ORDER BY avg_freight_price DESC
+LIMIT 3;
+
+SELECT orderdate
+FROM orders
+WHERE EXTRACT (YEAR FROM orderdate) = 1997;
+
+
+
+-- 27
+-- This problem doesn't apply to our dataset, since we have date type not datetime type.
+
+-- 28
+
+
+-- postgres has a very easy way to deal with dates:
+
+
+SELECT shipcountry, AVG(freight) AS avg_freight
+FROM orders
+WHERE orderdate > (SELECT MAX(orderdate) FROM orders) - interval '1 year'
+GROUP BY (shipcountry)
+ORDER BY avg_freight DESC
+LIMIT 3;
+
+
+-- 29
+
+
+SELECT e.employeeid, e.lastname, o.orderid, p.productname, od.quantity
+FROM orders AS o
+LEFT JOIN order_details AS od
+ON o.orderid = od.orderid
+LEFT JOIN products AS p
+ON od.productid = p.productid
+LEFT JOIN employees AS e
+ON o.employeeid = e.employeeid
+ORDER BY o.orderid, p.productid;
+
+-- 30
+
+SELECT c.customerid, o.orderid
+FROM customers AS c
+LEFT JOIN orders AS o
+ON c.customerid = o.customerid
+WHERE orderid is null;
 
 
 
 
+-- 31
+
+-- select all customers who have placed an order with employee 4
+WITH t1 AS (
+SELECT DISTINCT customerid
+FROM orders
+WHERE employeeid = 4)
+
+
+SELECT c.customerid
+FROM customers AS c
+WHERE c.customerid NOT IN (SELECT * FROM t1)
+ORDER BY customerid;
+
+-- alternative method
+WITH t1 AS (
+SELECT DISTINCT customerid
+FROM orders
+WHERE employeeid = 4)
+
+
+SELECT c.customerid
+FROM customers AS c
+LEFT JOIN t1
+ON c.customerid = t1.customerid
+WHERE t1.customerid is null
+ORDER BY c.customerid;
+
+
+-- 32
+
+SELECT *
+FROM orders;
+
+SELECT *
+FROM order_details;
+
+WITH t1 AS (
+SELECT o.orderid, o.orderdate, o.customerid, productid, unitprice, quantity, discount
+FROM orders AS o
+LEFT JOIN order_details AS od
+ON o.orderid = od.orderid),
+
+t2 AS(
+SELECT orderid, customerid, productid, unitprice * quantity AS product_total
+FROM t1
+),
+
+t3 AS (
+SELECT orderid,  SUM(product_total) AS order_total
+FROM t2
+GROUP BY orderid
+ORDER BY orderid)
+
+SELECT o.customerid, c.companyname, o.orderid,  order_total, o.orderdate
+FROM t3
+LEFT JOIN orders AS o
+ON t3.orderid = o.orderid
+LEFT JOIN customers AS c
+ON o.customerid = c.customerid
+WHERE order_total > 10000
+AND EXTRACT (YEAR FROM orderdate) = 1998
+ORDER BY order_total DESC
+;
+
+
+-- shorter solution
+
+WITH t1 AS (
+SELECT o.orderid, o.customerid, c.companyname, o.orderdate, od.unitprice * od.quantity AS product_total
+FROM orders AS o
+LEFT JOIN customers AS c
+ON o.customerid = c.customerid
+LEFt JOIN order_details AS od
+ON od.orderid = o.orderid
+WHERE EXTRACT (YEAR FROM orderdate) = 1998),
+
+t2 AS (
+SELECT orderid, SUM (product_total) AS order_total
+FROM t1 
+GROUP BY orderid)
+
+SELECT DISTINCT t1.orderid, t1.customerid, t1.companyname, t2.order_total
+FROM t2
+LEFT JOIN t1
+ON t2.orderid = t1.orderid
+WHERE order_total > 10000;
+
+
+-- 33
+
+WITH t1 AS (
+SELECT o.orderid, o.customerid, o.orderdate, od.unitprice, od.quantity, od.unitprice * od.quantity AS product_total
+FROM orders AS o
+LEFT JOIN order_details AS od
+ON o.orderid = od.orderid
+WHERE EXTRACT (YEAR FROM orderdate ) = 1998
+),
+
+t2 AS (
+SELECT customerid, SUM (product_total) AS orders_total
+FROM t1
+GROUP BY customerid
+)
+
+SELECT *
+FROM t2
+WHERE orders_total > 15000
+ORDER BY orders_total DESC
+    ;
+    
+-- using window functions
+
+WITH t1 AS(
+SELECT DISTINCT c.customerid,
+    c.companyname,
+SUM(od.unitprice * od.quantity) OVER (PARTITION BY c.customerid, EXTRACT( YEAR FROM orderdate)) AS total_sum
+FROM orders AS o
+LEFT JOIN customers AS c
+ON o.customerid = c.customerid
+LEFT JOIN order_details AS od
+ON o.orderid = od.orderid
+WHERE EXTRACT (YEAR FROM o.orderdate) = 1998
+)
+
+SELECT customerid, companyname, ROUND (total_sum::numeric, 2)
+FROM t1
+WHERE total_sum > 15000
+ORDER BY total_sum DESC;
 
 
 
+
+-- 38
+
+WITH t1 AS (
+SELECT orderid, productid, quantity, COUNT(*) OVER (PARTITION BY orderid, quantity) AS count
+FROM order_details
+WHERE quantity >= 60
+ORDER BY orderid)
+
+SELECT DISTINCT orderid
+FROM t1
+WHERE count >=2;
+
+
+-- 39
+
+WITH t1 AS (
+SELECT orderid, productid, quantity, COUNT(*) OVER (PARTITION BY orderid, quantity) AS count
+FROM order_details
+WHERE quantity >= 60
+ORDER BY orderid),
+
+t2 AS (
+SELECT DISTINCT orderid
+FROM t1
+WHERE count >=2)
+
+SELECT t2.orderid, od.productid, od.unitprice, od.quantity, od.discount
+FROM t2
+LEFT JOIN order_details AS od
+ON t2.orderid = od.orderid
+ORDER BY orderid;
+
+
+-- 41
+
+SELECT orderid, orderdate, requireddate, shippeddate
+FROM orders
+WHERE shippeddate > requireddate;
+
+
+-- 42
+
+-- select orderid and employeeid of late shipments
+WITH t1 AS (
+SELECT orderid, employeeid
+FROM orders
+WHERE shippeddate > requireddate),
+
+
+t2 AS (
+SELECT CONCAT (e.firstname, ' ', e.lastname) AS full_name
+FROM t1 
+LEFT JOIN employees AS e
+ON t1.employeeid = e.employeeid)
+
+SELECT full_name, COUNT(full_name) AS total_late_orders
+FROM t2
+GROUP BY full_name
+ORDER BY total_late_orders DESC;
+
+
+-- 43
+
+WITH t1 AS (
+SELECT employeeid, orderid, 
+COUNT (*) OVER (PARTITION BY employeeid) AS total_orders,
+CASE WHEN shippeddate > requireddate THEN 1 ELSE 0 END AS late
+FROM orders),
+
+t2 AS (
+SELECT DISTINCT employeeid, total_orders, SUM(late) OVER (PARTITION BY employeeid) AS late_orders
+FROM t1
+ORDER BY late_orders DESC)
+
+SELECT e.lastname, t2.total_orders, t2.late_orders
+FROM t2
+LEFT JOIN employees AS e
+ON t2.employeeid = e.employeeid;
+
+
+
+
+-- 46
+
+
+WITH t1 AS (
+SELECT employeeid, orderid, 
+COUNT (*) OVER (PARTITION BY employeeid) AS total_orders,
+CASE WHEN shippeddate > requireddate THEN 1 ELSE 0 END AS late
+FROM orders),
+
+t2 AS (
+SELECT DISTINCT employeeid, total_orders, SUM(late) OVER (PARTITION BY employeeid) AS late_orders
+FROM t1
+ORDER BY late_orders DESC),
+
+t3 AS (
+SELECT e.lastname, t2.total_orders, t2.late_orders, 1.0 * 100 * t2.late_orders / t2.total_orders AS late_percentage
+FROM t2
+LEFT JOIN employees AS e
+ON t2.employeeid = e.employeeid)
+
+SELECT lastname, total_orders, late_orders, ROUND(late_percentage, 2)
+FROM t3
+;
+
+
+-- 48
+
+WITH t1 AS (
+SELECT o.orderid, o.customerid, o.orderdate, od.unitprice, od.quantity, 
+        ROUND ((od.unitprice * od.quantity)::numeric, 2) AS product_total
+FROM orders AS o
+LEFT JOIN order_details AS od
+ON o.orderid = od.orderid
+WHERE EXTRACT (YEAR FROM orderdate) = 1998),
+
+t2 AS (
+SELECT DISTINCT customerid, SUM(product_total) OVER (PARTITION BY customerid) AS total_amount
+FROM t1)
+
+
+SELECT customerid, total_amount, 
+        CASE WHEN total_amount <1000 THEN 'low'
+             WHEN total_amount <5000 THEN 'medium'
+             WHEN total_amount <10000 THEN 'high'
+             ELSE 'very high' END AS customergroup
+FROM t2
+
+
+;
+
+-- 50
+
+WITH t1 AS (
+SELECT o.orderid, o.customerid, o.orderdate, od.unitprice, od.quantity, 
+        ROUND ((od.unitprice * od.quantity)::numeric, 2) AS product_total
+FROM orders AS o
+LEFT JOIN order_details AS od
+ON o.orderid = od.orderid
+WHERE EXTRACT (YEAR FROM orderdate) = 1998),
+
+t2 AS (
+SELECT DISTINCT customerid, SUM(product_total) OVER (PARTITION BY customerid) AS total_amount
+FROM t1),
+
+t3 AS (
+SELECT customerid, total_amount, 
+        CASE WHEN total_amount <1000 THEN 'low'
+             WHEN total_amount <5000 THEN 'medium'
+             WHEN total_amount <10000 THEN 'high'
+             ELSE 'very high' END AS customergroup
+FROM t2),
+
+
+t4 AS (
+SELECT customergroup, COUNT (customergroup)
+FROM t3
+GROUP BY customergroup),
+
+t5 AS (
+SELECT SUM(count)
+FROM t4)
+
+SELECT customergroup, count, (SELECT sum FROM t5) AS total,  1.0 * 100 * count / (SELECT sum FROM t5) AS percentage
+FROM t4
+ORDER BY percentage DESC
+;
+
+-- 51
+
+SELECT *
+FROM CustomerGroupThreshold;
+
+
+
+WITH t1 AS (
+SELECT o.orderid, o.customerid, o.orderdate, od.unitprice, od.quantity, 
+        ROUND ((od.unitprice * od.quantity)::numeric, 2) AS product_total
+FROM orders AS o
+LEFT JOIN order_details AS od
+ON o.orderid = od.orderid
+WHERE EXTRACT (YEAR FROM orderdate) = 1998),
+
+t2 AS (
+SELECT DISTINCT customerid, SUM(product_total) OVER (PARTITION BY customerid) AS total_amount
+FROM t1)
+
+SELECT *,
+CASE WHEN total_amount >= (SELECT rangebottom FROM CustomerGroupThreshold WHERE groupname = 'Low')
+        AND total_amount < (SELECT rangetop FROM CustomerGroupThreshold WHERE groupname = 'Low') THEN 'Low'
+     WHEN total_amount >= (SELECT rangebottom FROM CustomerGroupThreshold WHERE groupname = 'Medium')
+        AND total_amount < (SELECT rangetop FROM CustomerGroupThreshold WHERE groupname = 'Medium') THEN 'Medium'
+     WHEN total_amount >= (SELECT rangebottom FROM CustomerGroupThreshold WHERE groupname = 'High')
+        AND total_amount < (SELECT rangetop FROM CustomerGroupThreshold WHERE groupname = 'High') THEN 'High'
+        ELSE 'Very High' END AS group_cat      
+FROM t2;
+
+
+-- 52
+
+SELECT DISTINCT country
+FROM suppliers
+UNION
+SELECT DISTINCT country
+FROM customers
+ORDER BY country;
+
+
+-- 53
+WITH t1 AS (
+SELECT DISTINCT country
+FROM suppliers
+UNION
+SELECT DISTINCT country
+FROM customers
+ORDER BY country
+),
+
+t2 AS (
+SELECT *, ROW_NUMBER() OVER () AS row_num
+FROM t1
+)
+
+SELECT DISTINCT row_num, s.country AS supplier_country, c.country AS customer_country
+FROM t2 
+LEFT JOIN suppliers AS s
+ON t2.country = s.country
+LEFT JOIN customers AS c
+ON t2.country = c.country
+ORDER BY row_num;
+
+
+-- 54
+
+-- list of all countries
+
+WITH t1 AS (
+SELECT DISTINCT country
+FROM suppliers
+UNION
+SELECT DISTINCT country
+FROM customers
+ORDER BY country
+),
+
+t2 AS (
+SELECT t1.country, COUNT (c.country) AS num_customers
+FROM t1
+LEFT JOIN customers AS c
+ON t1.country = c.country
+GROUP BY t1.country
+ORDER BY t1.country),
+
+t3 AS (
+SELECT t1.country, COUNT (s.country) AS num_suppliers
+FROM t1
+LEFT JOIN suppliers AS s
+ON t1.country = s.country
+GROUP BY t1.country
+ORDER BY t1.country
+)
+
+SELECT t1.country, t3.num_suppliers, t2.num_customers
+FROM t1
+LEFT JOIN t2
+ON t1.country = t2.country
+LEFT JOIN t3
+ON t1.country = t3.country
+    ;
+
+-- I think you could actually do all of this in one go: 
+
+
+-- list of all countries
+
+WITH t1 AS (
+SELECT DISTINCT country
+FROM suppliers
+UNION
+SELECT DISTINCT country
+FROM customers
+ORDER BY country
+)
+
+SELECT DISTINCT t1.country, 
+          COUNT (s.supplierid) OVER (PARTITION BY s.country) AS num_suppliers,
+          COUNT (c.customerid) OVER (PARTITION BY c.country) AS num_customers
+FROM t1
+LEFT JOIN suppliers AS s
+ON t1.country = s.country
+LEFT JOIN customers AS c
+ON t1.country = c.country
+ORDER BY t1.country
+;
 
 
 
